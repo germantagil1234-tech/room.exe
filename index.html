@@ -288,47 +288,78 @@
         return texture;
     }
 
-    // Функция для создания процедурной текстуры стен (обои с вертикальными полосами)
+    // НОВАЯ ФУНКЦИЯ ДЛЯ СОЗДАНИЯ ТЕКСТУРЫ ОБОЕВ (НЕ ПОХОЖЕЙ НА ШКАФ)
     function createWallTexture() {
         const canvas = document.createElement('canvas');
-        canvas.width = 256;
-        canvas.height = 256;
+        canvas.width = 512;
+        canvas.height = 512;
         const ctx = canvas.getContext('2d');
         
-        ctx.fillStyle = '#3a2a1a';
-        ctx.fillRect(0, 0, 256, 256);
+        // Фоновый цвет старых обоев (грязно-зеленоватый)
+        ctx.fillStyle = '#4a5d4e';
+        ctx.fillRect(0, 0, 512, 512);
         
-        ctx.fillStyle = '#2c1e12';
-        for (let i = 0; i < 256; i += 16) {
-            ctx.fillRect(i, 0, 8, 256);
+        // Рисуем дамасский узор или что-то похожее на старые обои
+        ctx.strokeStyle = '#2c3a2e';
+        ctx.lineWidth = 4;
+        
+        // Ромбовидный узор
+        for (let y = -256; y < 768; y += 80) {
+            for (let x = -256; x < 768; x += 80) {
+                // Рисуем цветочный/геометрический мотив
+                ctx.beginPath();
+                ctx.moveTo(x, y + 20);
+                ctx.lineTo(x + 20, y);
+                ctx.lineTo(x + 40, y + 20);
+                ctx.lineTo(x + 20, y + 40);
+                ctx.closePath();
+                ctx.fillStyle = '#3a4a3c';
+                ctx.fill();
+                ctx.strokeStyle = '#1e2a1f';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                // Внутренний ромб
+                ctx.beginPath();
+                ctx.moveTo(x + 10, y + 20);
+                ctx.lineTo(x + 20, y + 10);
+                ctx.lineTo(x + 30, y + 20);
+                ctx.lineTo(x + 20, y + 30);
+                ctx.closePath();
+                ctx.fillStyle = '#5a6e5c';
+                ctx.fill();
+                ctx.strokeStyle = '#2c3a2e';
+                ctx.stroke();
+            }
         }
         
-        ctx.strokeStyle = '#5a4530';
+        // Вертикальные полосы (эффект старых обоев)
+        ctx.strokeStyle = '#3a4a3c';
         ctx.lineWidth = 1;
-        for (let i = 4; i < 256; i += 16) {
+        for (let i = 0; i < 512; i += 20) {
             ctx.beginPath();
-            ctx.moveTo(i, 0);
-            ctx.lineTo(i, 256);
+            ctx.moveTo(i + Math.sin(i*0.01)*5, 0);
+            ctx.lineTo(i + 5 + Math.cos(i*0.01)*5, 512);
             ctx.stroke();
         }
         
-        const imageData = ctx.getImageData(0, 0, 256, 256);
+        // Добавляем потёртости и грязь
+        const imageData = ctx.getImageData(0, 0, 512, 512);
         const data = imageData.data;
         for (let i = 0; i < data.length; i += 4) {
-            const noise = (Math.random() - 0.5) * 20;
+            const noise = (Math.random() - 0.5) * 15;
             data[i] = Math.max(0, Math.min(255, data[i] + noise));
-            data[i+1] = Math.max(0, Math.min(255, data[i+1] + noise));
-            data[i+2] = Math.max(0, Math.min(255, data[i+2] + noise));
+            data[i+1] = Math.max(0, Math.min(255, data[i+1] + noise * 0.9));
+            data[i+2] = Math.max(0, Math.min(255, data[i+2] + noise * 0.8));
         }
         ctx.putImageData(imageData, 0, 0);
         
-        ctx.strokeStyle = '#4a3a2a';
-        ctx.lineWidth = 0.5;
-        for (let y = 20; y < 256; y += 40) {
+        // Добавляем случайные пятна
+        for (let k = 0; k < 15; k++) {
+            ctx.fillStyle = `rgba(30, 40, 30, ${0.1 + Math.random()*0.2})`;
             ctx.beginPath();
-            ctx.moveTo(0, y + Math.random() * 5);
-            ctx.lineTo(256, y + Math.random() * 5);
-            ctx.stroke();
+            ctx.arc(50 + Math.random()*412, 50 + Math.random()*412, 20 + Math.random()*30, 0, Math.PI*2);
+            ctx.fill();
         }
         
         const texture = new THREE.CanvasTexture(canvas);
@@ -385,12 +416,12 @@
         const woodTexture = createWoodTexture();
         const floorMat = new THREE.MeshStandardMaterial({ map: woodTexture, roughness: 0.8, metalness: 0.1 });
         
-        // Текстура стен
+        // НОВАЯ Текстура стен (обои)
         const wallTexture = createWallTexture();
         const wallMat = new THREE.MeshStandardMaterial({ 
             map: wallTexture, 
-            roughness: 0.7, 
-            metalness: 0.1,
+            roughness: 0.9, 
+            metalness: 0.0,
             side: THREE.BackSide 
         });
         
@@ -412,13 +443,68 @@
         interactables.push(breaker);
         collisionObjects.push(breaker);
 
-        // ШКАФ (добавляем в collisionObjects)
-        const closet = new THREE.Mesh(new THREE.BoxGeometry(1.5, 3, 1.5), new THREE.MeshStandardMaterial({color: 0x3d2b1f}));
-        closet.position.set(2.2, 1.5, -2.2);
-        closet.userData = { name: "ШКАФ", type: "closet" };
-        scene.add(closet); 
-        interactables.push(closet);
-        collisionObjects.push(closet);
+        // ШКАФ (добавляем в collisionObjects) - теперь с текстурой и ручками (исправлено: ручки только снаружи)
+        const closetGroup = new THREE.Group();
+        
+        // Текстура для шкафа (более темное дерево)
+        const closetCanvas = document.createElement('canvas');
+        closetCanvas.width = 256;
+        closetCanvas.height = 256;
+        const cCtx = closetCanvas.getContext('2d');
+        cCtx.fillStyle = '#4a2c1a';
+        cCtx.fillRect(0, 0, 256, 256);
+        for (let i = 0; i < 256; i+= 8) {
+            cCtx.strokeStyle = '#2e1a0c';
+            cCtx.lineWidth = 2;
+            cCtx.beginPath();
+            cCtx.moveTo(i + Math.sin(i)*3, 0);
+            cCtx.lineTo(i + 10 + Math.cos(i)*3, 256);
+            cCtx.stroke();
+            cCtx.strokeStyle = '#694126';
+            cCtx.lineWidth = 1.5;
+            cCtx.beginPath();
+            cCtx.moveTo(i-3, 0);
+            cCtx.lineTo(i+5, 256);
+            cCtx.stroke();
+        }
+        // Шум
+        const cImg = cCtx.getImageData(0, 0, 256, 256);
+        const cData = cImg.data;
+        for (let i = 0; i < cData.length; i+=4) {
+            const n = (Math.random() - 0.5) * 20;
+            cData[i] = Math.max(0, Math.min(255, cData[i] + n));
+            cData[i+1] = Math.max(0, Math.min(255, cData[i+1] + n*0.7));
+            cData[i+2] = Math.max(0, Math.min(255, cData[i+2] + n*0.4));
+        }
+        cCtx.putImageData(cImg, 0, 0);
+        const closetTexture = new THREE.CanvasTexture(closetCanvas);
+        
+        const closetMat = new THREE.MeshStandardMaterial({ map: closetTexture, roughness: 0.9, metalness: 0.05 });
+        const closetBody = new THREE.Mesh(new THREE.BoxGeometry(1.5, 3, 1.5), closetMat);
+        closetBody.position.y = 1.5;
+        closetGroup.add(closetBody);
+        
+        // Ручки шкафа (размещаем на ПЕРЕДНЕЙ стороне шкафа, Z положительный, если смотреть изнутри комнаты)
+        const handleMat = new THREE.MeshStandardMaterial({ color: 0xbba88a, roughness: 0.4, metalness: 0.3 });
+        // Левая ручка
+        const handleLeft = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.4, 6), handleMat);
+        handleLeft.rotation.z = Math.PI / 2;
+        handleLeft.position.set(-0.5, 1.5, 0.76);
+        closetGroup.add(handleLeft);
+        // Правая ручка
+        const handleRight = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.4, 6), handleMat);
+        handleRight.rotation.z = Math.PI / 2;
+        handleRight.position.set(0.5, 1.5, 0.76);
+        closetGroup.add(handleRight);
+        
+        closetGroup.position.set(2.2, 0, -2.2);
+        // Поворачиваем шкаф так, чтобы его передняя сторона (с ручками) смотрела ВНУТРЬ комнаты (к игроку)
+        closetGroup.rotation.y = Math.PI; // разворачиваем на 180 градусов
+        closetGroup.userData = { name: "ШКАФ", type: "closet" };
+        
+        scene.add(closetGroup); 
+        interactables.push(closetGroup);
+        collisionObjects.push(closetGroup);
 
         // ТУМБОЧКА ПОД ТВ
         const nightstand = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.6, 1.2), new THREE.MeshStandardMaterial({color: 0x2b1d0f}));
@@ -480,9 +566,10 @@
         if(!controls.isLocked) return;
 
         raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
-        const intersects = raycaster.intersectObjects(interactables);
+        const intersects = raycaster.intersectObjects(interactables, true);
         if(intersects.length > 0 && intersects[0].distance < 3) {
-            const obj = intersects[0].object;
+            let obj = intersects[0].object;
+            while(obj.parent && !obj.userData.type) obj = obj.parent;
             if(obj.userData.type === 'breaker') openBreaker();
             if(obj.userData.type === 'closet') enterCloset();
         }
@@ -671,10 +758,12 @@
 
         if(controls.isLocked && !state.inCloset && !state.inBreaker) {
             raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
-            const intersects = raycaster.intersectObjects(interactables);
+            const intersects = raycaster.intersectObjects(interactables, true);
             if(intersects.length > 0 && intersects[0].distance < 3) {
                 dom.prompt.style.display = 'block';
-                dom.prompt.innerText = `[КЛИК] ${intersects[0].object.userData.name}`;
+                let obj = intersects[0].object;
+                while(obj.parent && !obj.userData.name) obj = obj.parent;
+                dom.prompt.innerText = `[КЛИК] ${obj.userData.name || 'ШКАФ'}`;
             } else {
                 dom.prompt.style.display = 'none';
             }
